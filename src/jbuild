@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+ ((name thread_pool)
+  (public_name async-thread-pool)
+  (libraries (base async_kernel async_unix))))

@@ -1,0 +1,14 @@
+opam-version: "1.2"
+maintainer: "Marek Kubica <mku@issuu.com>"
+author: "Team Raccoon"
+homepage: "https://github.com/issuu/async-thread-pool"
+dev-repo: "git@github.com:issuu/async-thread-pool.git"
+bug-reports: "https://github.com/issuu/async-thread-pool/issues"
+build: [["jbuilder" "build" "-p" name "-j" jobs]]
+build-test: [["jbuilder" "runtest" "-p" name "-j" jobs]]
+depends: [
+  "jbuilder" {build}
+  "async_kernel" {>= "v0.9" & < "v0.12"}
+  "async_unix" {>= "v0.9" & < "v0.12"}
+  "base" {>= "v0.9" & < "v0.12"}
+]
