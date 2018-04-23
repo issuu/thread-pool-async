@@ -11,4 +11,7 @@ depends: [
   "async_kernel" {>= "v0.9" & < "v0.12"}
   "async_unix" {>= "v0.9" & < "v0.12"}
   "base" {>= "v0.9" & < "v0.12"}
+  "ppx_let" {>= "v0.9" & < "v0.12"}
+  "alcotest" {test}
+  "alcotest-async" {test}
 ]

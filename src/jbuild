@@ -3,4 +3,5 @@
 (library
  ((name thread_pool)
   (public_name async-thread-pool)
+  (preprocess (pps (ppx_let)))
   (libraries (base async_kernel async_unix))))
