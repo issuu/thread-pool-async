@@ -25,21 +25,38 @@ let init ~name ~(threads: int) ~(create: unit -> 'state) ~(destroy: 'state -> un
   let%bind () = Deferred.List.iter elements ~how:`Parallel ~f:add_to_pool in
   return { pool = (reader, writer); create; destroy; threads }
 
-let with_ { pool = (reader, writer); create; destroy; _ } ~(f: 'state -> 'result) : 'result Deferred.Or_error.t =
+type 'result computation = [`Ok of 'result | `Attempt_retry]
+
+let with'
+  : 'state t -> ?retries:int -> ('state -> 'result computation) -> 'result Deferred.Or_error.t
+  = fun { pool = (reader, writer); create; destroy; _ } ?(retries=0) f ->
+  let run_once
+    : 'thread -> 'state -> ('result computation Or_error.t * 'state) Deferred.t
+    = fun thread state ->
+    let%bind result = In_thread.run ~thread (fun () -> Or_error.try_with (fun () -> f state)) in
+    match result with
+    | Ok res -> return (Ok res, state)
+    | Error _ as e ->
+        let%bind () = In_thread.run ~thread (fun () -> destroy state) in
+        let%bind state = In_thread.run ~thread create in
+        return (e, state)
+  in
   match%bind Pipe.read reader with
-  | `Eof -> return (Or_error.errorf "Pool has been destroyed")
+  | `Eof -> return @@ Or_error.errorf "Pool has been destroyed"
   | `Ok (thread, state) ->
-      let%bind result = In_thread.run ~thread (fun () -> Or_error.try_with (fun () -> f state)) in
-      let%bind state' =
-        match result with
-        | Result.Ok _ -> return state
-        | Result.Error _ ->
-            let%bind () = In_thread.run ~thread (fun () -> destroy state) in
-            let%bind state = In_thread.run ~thread create in
-            return state
-      in
-      Pipe.write_without_pushback writer (thread, state');
-      return result
+    let rec run_with_retry retries_left =
+      let%bind result, state = run_once thread state in
+      match result with
+      | Ok `Ok result -> return (Ok result, state)
+      | Ok `Attempt_retry ->
+        (match retries_left with
+        | n when n <= 0 -> return (Or_error.error_string "No more retries", state)
+        | n -> run_with_retry (Int.pred n))
+      | Error err -> return (Error err, state)
+    in
+    let%bind result, state' = run_with_retry retries in
+    Pipe.write_without_pushback writer (thread, state');
+    return result
 
 let destroy { pool = (reader, writer); threads; destroy; _ } : unit Deferred.t =
   let elements = List.init threads ~f:ignore in
