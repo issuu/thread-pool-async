@@ -12,15 +12,15 @@ clean: ## Clean up source tree manually
 
 .PHONY: distrib
 distrib: ## Create a distribution tarball
-	topkg distrib
+	dune-release distrib
 
 .PHONY: tag
 tag: ## Tag the current release
-	topkg tag
+	dune-release tag
 
 .PHONY: publish
 publish: ## Put the release on GitHub
-	topkg publish distrib
+	dune-release publish distrib
 
 .PHONY: help
 help: ## Show this help
