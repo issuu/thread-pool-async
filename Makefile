@@ -1,14 +1,14 @@
 .PHONY: all
 all: ## Build the code
-	jbuilder build --dev
+	dune build
 
 .PHONY: test
 test: ## Run unit tests
-	jbuilder runtest --force
+	dune runtest --force
 
 .PHONY: clean
 clean: ## Clean up source tree manually
-	jbuilder clean
+	dune clean
 
 .PHONY: distrib
 distrib: ## Create a distribution tarball
