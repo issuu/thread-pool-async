@@ -30,16 +30,25 @@ type 'result computation = [`Ok of 'result | `Attempt_retry]
 let with'
   : 'state t -> ?retries:int -> ('state -> 'result computation) -> 'result Deferred.Or_error.t
   = fun { pool = (reader, writer); create; destroy; _ } ?(retries=0) f ->
+  assert (retries >= 0);
+
+  let recreate ~thread state =
+    let%bind () = In_thread.run ~thread (fun () -> destroy state) in
+    In_thread.run ~thread create
+  in
+
   let run_once
     : 'thread -> 'state -> ('result computation Or_error.t * 'state) Deferred.t
     = fun thread state ->
     let%bind result = In_thread.run ~thread (fun () -> Or_error.try_with (fun () -> f state)) in
     match result with
-    | Ok res -> return (Ok res, state)
+    | Ok `Ok res -> return (Ok (`Ok res), state)
+    | Ok `Attempt_retry ->
+      let%bind state = recreate ~thread state in
+      return (Ok `Attempt_retry, state)
     | Error _ as e ->
-        let%bind () = In_thread.run ~thread (fun () -> destroy state) in
-        let%bind state = In_thread.run ~thread create in
-        return (e, state)
+      let%bind state = recreate ~thread state in
+      return (e, state)
   in
   match%bind Pipe.read reader with
   | `Eof -> return @@ Or_error.errorf "Pool has been destroyed"

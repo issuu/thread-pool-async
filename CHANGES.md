@@ -1,3 +1,6 @@
+* Rename `Thread_pool.with_` to `Thread_pool.with'`
+* Support retries with Thread_pool.with
+
 0.9.0
 =====
 
