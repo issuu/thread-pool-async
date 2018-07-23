@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name thread_pool)
-  (public_name thread-pool-async)
-  (preprocess (pps (ppx_let)))
-  (libraries (base async_kernel async_unix))))

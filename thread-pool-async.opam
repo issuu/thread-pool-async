@@ -4,10 +4,10 @@ author: "Team Raccoon"
 homepage: "https://github.com/issuu/thread-pool-async"
 dev-repo: "git@github.com:issuu/thread-pool-async.git"
 bug-reports: "https://github.com/issuu/thread-pool-async/issues"
-build: [["jbuilder" "build" "-p" name "-j" jobs]]
-build-test: [["jbuilder" "runtest" "-p" name "-j" jobs]]
+build: [["dune" "build" "-p" name "-j" jobs]]
+build-test: [["dune" "runtest" "-p" name "-j" jobs]]
 depends: [
-  "jbuilder" {build}
+  "dune" {build}
   "async_kernel" {>= "v0.9" & < "v0.12"}
   "async_unix" {>= "v0.9" & < "v0.12"}
   "base" {>= "v0.9" & < "v0.12"}
