@@ -7,21 +7,20 @@ Dependencies
 ------------
 
   * OPAM 2
-  * `topkg-care` (for releases)
-  * `topkg-jbuilder` (for releases)
+  * `dune-release` (for releases)
 
 Usage
 -----
 
-It is a normal `jbuilder` project, can be built in all normal ways `jbuilder`
+It is a normal `dune` project, can be built in all normal ways `dune`
 software can be built. The `make help` command provides a list of possibly
 useful actions.
 
 Release process
 ---------------
 
-Releasing a new version is handled by `topkg`, check the [Mirage instructions][mirage]
-on their packaging process.
+Releasing a new version is handled by `dune-release`, check the
+[Mirage instructions][mirage] on their packaging process.
 
 1. Write changelog entry
 1. `make tag` to tag the repository locally
