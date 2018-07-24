@@ -14,5 +14,4 @@ depends: [
   "ppx_let" {>= "v0.9" & < "v0.12"}
   "alcotest" {test}
   "alcotest-async" {test}
-  "fmt" {test}
 ]

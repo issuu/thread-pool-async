@@ -1,7 +1,7 @@
 (executable
  (name test)
  (preprocess (pps ppx_let))
- (libraries alcotest alcotest-async fmt thread_pool))
+ (libraries alcotest alcotest-async thread_pool))
 
 (alias
  (name runtest)
