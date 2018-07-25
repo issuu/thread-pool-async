@@ -14,7 +14,7 @@ let test_simple () =
   let destroy () = Int.decr states in
   let worker () =
     Unix.sleepf 0.005;
-    `Ok (Int.incr jobs)
+    return @@ `Ok (Int.incr jobs)
   in
 
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
@@ -44,7 +44,7 @@ let test_error () =
       failwith "Stop"
     | _ ->
       Unix.sleepf 0.005;
-      `Ok (Int.incr jobs)
+      return @@ `Ok (Int.incr jobs)
   in
 
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy:ignore in
@@ -70,7 +70,7 @@ let test_retry () =
       | false -> `Ok (Int.incr work_done)
     in
     should_fail := false;
-    result
+    return result
   in
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
   let%bind _result = List.init work_expected ~f:ignore |> Deferred.Or_error.List.iter ~how:`Parallel ~f:(fun () -> Thread_pool.with' ~retries:1 pool (worker (ref true))) in
@@ -89,7 +89,7 @@ let test_retry_fail () =
   let destroy = ignore in
   let worker () =
     Int.incr tries;
-    `Attempt_retry
+    return `Attempt_retry
   in
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
   let%bind result = List.init work ~f:ignore |> Deferred.Or_error.List.iter ~how:`Parallel ~f:(fun () -> Thread_pool.with' ~retries:0 pool worker) in
