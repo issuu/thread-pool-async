@@ -1,5 +1,6 @@
-open Base
+open Core
 open Async_kernel
+open Async_unix
 
 let unit_or_error =
   (* exact error does not matter *)
@@ -13,7 +14,7 @@ let test_simple () =
   let create () = Int.incr states in
   let destroy () = Int.decr states in
   let worker () =
-    Unix.sleepf 0.005;
+    let%bind () = after (Time.Span.of_ms 5.) in
     return @@ `Ok (Int.incr jobs)
   in
 
@@ -43,7 +44,7 @@ let test_error () =
       Int.incr errors;
       failwith "Stop"
     | _ ->
-      Unix.sleepf 0.005;
+      let%bind () = after (Time.Span.of_ms 5.) in
       return @@ `Ok (Int.incr jobs)
   in
 
