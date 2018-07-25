@@ -1,6 +1,8 @@
 Thread_pool
 ===========
 
+[![Build Status](https://travis-ci.org/issuu/thread-pool-async.svg?branch=master)](https://travis-ci.org/issuu/thread-pool-async)
+
 Creates an async thread pool so your blocking calls are contained in threads.
 
 Dependencies
