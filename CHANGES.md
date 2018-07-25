@@ -1,3 +1,6 @@
+0.10.0
+======
+
 * Rename `Thread_pool.with_` to `Thread_pool.with'`
 * Support retries with `Thread_pool.with'`
 * Migrate jbuilder to dune
