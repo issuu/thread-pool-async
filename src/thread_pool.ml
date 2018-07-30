@@ -53,17 +53,17 @@ let with'
   match%bind Pipe.read reader with
   | `Eof -> return @@ Or_error.errorf "Pool has been destroyed"
   | `Ok (thread, state) ->
-    let rec run_with_retry retries_left =
+    let rec run_with_retry state retries_left =
       let%bind result, state = run_once thread state in
       match result with
       | Ok `Ok result -> return (Ok result, state)
       | Ok `Attempt_retry ->
         (match retries_left with
         | n when n <= 0 -> return (Or_error.error_string "No more retries", state)
-        | n -> run_with_retry (Int.pred n))
+        | n -> run_with_retry state (Int.pred n))
       | Error err -> return (Error err, state)
     in
-    let%bind result, state' = run_with_retry retries in
+    let%bind result, state' = run_with_retry state retries in
     Pipe.write_without_pushback writer (thread, state');
     return result
 
