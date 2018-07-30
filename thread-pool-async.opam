@@ -2,6 +2,7 @@ opam-version: "1.2"
 maintainer: "Marek Kubica <mku@issuu.com>"
 author: "Team Raccoon"
 homepage: "https://github.com/issuu/thread-pool-async"
+doc: "https://issuu.github.io/thread-pool-async/"
 dev-repo: "git@github.com:issuu/thread-pool-async.git"
 bug-reports: "https://github.com/issuu/thread-pool-async/issues"
 build: [["dune" "build" "-p" name "-j" jobs]]
