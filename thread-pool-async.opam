@@ -18,3 +18,5 @@ depends: [
   "core" {with-test & >= "v0.9"}
 ]
 synopsis: "A pool of background threads that can be used to defer computation and use Async with non-async code"
+description: """
+Useful for running blocking code alongside non-blocking code."""
