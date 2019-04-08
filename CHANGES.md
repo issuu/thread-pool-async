@@ -1,3 +1,6 @@
+0.11.0
+======
+
 * Rename module from `Thread_pool` to `Thread_pool_async`
 * Use OPAM 2 format
 * Do not version constrain Janestreet dependencies
