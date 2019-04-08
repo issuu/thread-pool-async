@@ -2,6 +2,8 @@ open Core
 open Async_kernel
 open Async_unix
 
+module Thread_pool = Thread_pool_async
+
 let unit_or_error =
   (* exact error does not matter *)
   Alcotest.result Alcotest.unit Alcotest.pass
