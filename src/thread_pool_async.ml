@@ -28,7 +28,7 @@ let init ~name ~(threads: int) ~(create: unit -> 'state) ~(destroy: 'state -> un
 type 'result computation = [`Ok of 'result | `Attempt_retry]
 
 let with'
-  : 'state t -> ?retries:int -> ('state -> 'result computation Deferred.t) -> 'result Deferred.Or_error.t
+  : 'state t -> ?retries:int -> ('state -> 'result computation) -> 'result Deferred.Or_error.t
   = fun { pool = (reader, writer); create; destroy; _ } ?(retries=0) f ->
   assert (retries >= 0);
 
@@ -40,7 +40,7 @@ let with'
   let run_once
     : 'thread -> 'state -> ('result computation Or_error.t * 'state) Deferred.t
     = fun thread state ->
-    let%bind result = In_thread.run ~thread (fun () -> Deferred.Or_error.try_with (fun () -> f state)) |> Deferred.join in
+    let%bind result = In_thread.run ~thread (fun () -> Or_error.try_with (fun () -> f state)) in
     match result with
     | Ok `Ok res -> return (Ok (`Ok res), state)
     | Ok `Attempt_retry ->
