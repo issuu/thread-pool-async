@@ -1,3 +1,6 @@
+0.12.0
+======
+
 * Remove `Deferred.t` from function running in the pool. Running async
   operations outside the main thread is not safe.
 
