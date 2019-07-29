@@ -15,7 +15,7 @@ let test_simple () =
   let destroy () = Int.decr states in
   let worker () =
     ignore @@ Unix.nanosleep 0.005;
-    `Ok (Int.incr jobs)
+    Some (Int.incr jobs)
   in
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
   Alcotest.(check int) "Pool not initialized correctly" threads !states;
@@ -45,7 +45,7 @@ let test_error () =
     | n when Int.rem n 2 = 0 -> Int.incr errors; failwith "Stop"
     | _ ->
         ignore @@ Unix.nanosleep 0.005;
-        `Ok (Int.incr jobs)
+        Some (Int.incr jobs)
   in
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy:ignore in
   let%bind _result =
@@ -70,8 +70,8 @@ let test_retry () =
   let worker should_fail () =
     let result =
       match !should_fail with
-      | true -> `Attempt_retry
-      | false -> `Ok (Int.incr work_done)
+      | true -> None
+      | false -> Some (Int.incr work_done)
     in
     should_fail := false;
     result
@@ -97,7 +97,7 @@ let test_retry_fail () =
   let tries = ref 0 in
   let create = ignore in
   let destroy = ignore in
-  let worker () = Int.incr tries; `Attempt_retry in
+  let worker () = Int.incr tries; None in
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
   let%bind result =
     List.init work ~f:ignore

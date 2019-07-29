@@ -1,3 +1,12 @@
+Unreleased
+==========
+
+* Generalized interface to make it possible to use the Async scheduler to
+  dynamically determine several related pieces of work that need to run on
+  the same thread.
+* Remove `computation` type in favor of the standard `option`.
+* Add `.mli` file.
+
 0.12.0
 ======
 
