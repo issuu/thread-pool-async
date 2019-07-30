@@ -6,6 +6,10 @@ all: ## Build the code
 test: ## Run unit tests
 	dune runtest --force
 
+.PHONY: format
+format: ## Reformat the code
+	dune build @fmt --auto-promote @install
+
 .PHONY: clean
 clean: ## Clean up source tree manually
 	dune clean

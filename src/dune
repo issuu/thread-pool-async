@@ -1,5 +1,6 @@
 (library
  (name thread_pool_async)
  (public_name thread-pool-async)
- (preprocess (pps ppx_let))
+ (preprocess
+  (pps ppx_let))
  (libraries base async_kernel async_unix))
