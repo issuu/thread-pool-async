@@ -1,7 +1,9 @@
-* Generalized interface to make it possible to use the Async scheduler to
+* Generalize interface to make it possible to use the Async scheduler to
   dynamically determine several related pieces of work that need to run on
   the same thread.
-* Remove `computation` type in favor of the standard `option`.
+* Stop wrapping exceptions thrown inside a worker thread in an `Or_error`.
+  Rethrow them instead.
+* Remove `computation` type in favor of the standard `result`.
 * Add `.mli` file.
 
 0.12.0
