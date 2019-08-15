@@ -118,7 +118,7 @@ let test_interleaving_work_with_async_scheduler () =
   let%bind result =
     Thread_pool.with_worker pool (fun worker ->
         let%bind worker_state_1 = Thread_pool.execute worker Fn.id in
-        let%bind () = Async_kernel.after (Time_ns.Span.of_ms 5.) in
+        let%bind () = after (Time_ns.Span.of_ms 5.) in
         let%bind worker_state_2 = Thread_pool.execute worker Fn.id in
         return
         @@
