@@ -6,9 +6,11 @@ type 'state t
 (** A single worker thread within the pool *)
 type 'state worker
 
-(** The type returned by functions that schedule work in the pool or on
-    specific worker threads *)
-type 'outcome result = 'outcome Deferred.Or_error.t
+(** Raised if the pool is initiated with a non-positive thread count *)
+exception Invalid_thread_count of int
+
+(** Raised if the pool is used after it has been destroyed *)
+exception Pool_already_destroyed
 
 (** Initializes a pool. The same name is used for all the threads in the
     pool. Each worker thread also has an associated piece of state. The
@@ -23,40 +25,51 @@ val init
 
 (** Runs a piece of work on the first available thread in the pool.
 
-    If the supplied function results in `None`, then `retries` specifies the
+    If the supplied function returns an error, then `retries` specifies the
     maximum number of times that the function is re-run. All retries are
     guaranteed to be on the same thread. If retries are exhausted without a
-    successful execution, then an error is returned.
+    successful execution, then the last encountered error is returned.
 
-    Whenever the supplied function returns `None` or throws an exception, the
-    state associated with the executing thread is cleaned up and a new piece
-    of state is created. *)
-val with' : 'state t -> ?retries:int -> ('state -> 'outcome option) -> 'outcome result
+    If the supplied function raises an exception, then that exception will be
+    raised to the monitor that called `with'`.
+
+    Whenever the supplied function returns an error or throws an exception,
+    the state associated with the executing thread is cleaned up and a new
+    piece of state is created to replace it. *)
+val with'
+  :  'state t ->
+  ?retries:int ->
+  ('state -> ('value, 'error) result) ->
+  ('value, 'error) Deferred.Result.t
 
 (** Reserves a worker thread and runs a function that can use the Async
     scheduler as well as the worker thread to do its job.
 
-    If the supplied function binds to `Ok None`, then `retries` specifies the
-    maximum number of times that the function is re-run. All retries are
+    If the supplied function results in an error, then `retries` specifies
+    the maximum number of times that the function is re-run. All retries are
     guaranteed to be on the same thread. If retries are exhausted without a
-    successful execution, then an error is returned.
+    successful execution, then the last encountered error is returned.
 
-    Whenever the supplied function binds to `Ok None` or to an error, the
-    state associated with the executing thread is cleaned up and a new piece
-    of state is created. *)
+    If the supplied function raises an exception, then that exception will be
+    raised to the monitor that called `with_worker`.
+
+    Whenever the supplied function results in an error or throws an
+    exception, the state associated with the executing thread is cleaned up
+    and a new piece of state is created to replace it. *)
 val with_worker
   :  'state t ->
   ?retries:int ->
-  ('state worker -> 'outcome option result) ->
-  'outcome result
+  ('state worker -> ('value, 'error) Deferred.Result.t) ->
+  ('value, 'error) Deferred.Result.t
 
 (** Executes the supplied function inside the specified worker thread.
 
-    Whenever the supplied function throws an exception, an error is returned.
-    
+    If the supplied function raises an exception, then that exception will be
+    raised to the monitor that called `execute`.
+
     Note that the state associated with the executing worker thread is never
     cleaned up or replaced by this function. *)
-val execute : 'state worker -> ('state -> 'outcome) -> 'outcome result
+val execute : 'state worker -> ('state -> 'outcome) -> 'outcome Deferred.t
 
 (** Frees up all worker threads in the pool as well as the state associated
     with them. *)
