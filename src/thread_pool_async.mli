@@ -1,15 +1,15 @@
 open Async_kernel
 
-(** A thread pool *)
+(** A thread pool. *)
 type 'state t
 
-(** A single worker thread within the pool *)
+(** A single worker thread within the pool. *)
 type 'state worker
 
-(** Raised if the pool is initiated with a non-positive thread count *)
+(** Raised if the pool is initiated with a non-positive thread count. *)
 exception Invalid_thread_count of int
 
-(** Raised if the pool is used after it has been destroyed *)
+(** Raised if the pool is used after it has been destroyed. *)
 exception Pool_already_destroyed
 
 (** Raised if the creation or destruction of the piece of state state
