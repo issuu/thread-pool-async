@@ -1,3 +1,6 @@
+* Destroy the whole pool in case an exception is thrown while creating or
+  destroying a piece of state associated with a worker thread. Indicate this
+  through a new exception type.
 * Generalize interface to make it possible to use the Async scheduler to
   dynamically determine several related pieces of work that need to run on
   the same thread.

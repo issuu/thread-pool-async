@@ -12,6 +12,14 @@ exception Invalid_thread_count of int
 (** Raised if the pool is used after it has been destroyed *)
 exception Pool_already_destroyed
 
+(** Raised if the creation or destruction of the piece of state state
+    associated with a worker thread raises an exception.
+    
+    When this exception is raised, the whole pool is already destroyed. In
+    order to execute any additional work, a new pool needs to be initialized
+    first. *)
+exception State_manipulation_error of exn
+
 (** Initializes a pool. The same name is used for all the threads in the
     pool. Each worker thread also has an associated piece of state. The
     `create` function initializes the state while the `destroy` function
@@ -35,7 +43,12 @@ val init
 
     Whenever the supplied function returns an error or throws an exception,
     the state associated with the executing thread is cleaned up and a new
-    piece of state is created to replace it. *)
+    piece of state is created to replace it.
+    
+    WARNING: Async code MUST NOT be used in the work callback. This
+    encompasses pretty much all functions of libraries making use of Async.
+    Only a few functions of the Async library can be called. These are
+    explicitly marked as such, using the phrase "thread-safe". *)
 val with'
   :  'state t ->
   ?retries:int ->
@@ -68,7 +81,12 @@ val with_worker
     raised to the monitor that called `execute`.
 
     Note that the state associated with the executing worker thread is never
-    cleaned up or replaced by this function. *)
+    cleaned up or replaced by this function.
+    
+    WARNING: Async code MUST NOT be used in the supplied function. This
+    encompasses pretty much all functions of libraries making use of Async.
+    Only a few functions of the Async library can be called. These are
+    explicitly marked as such, using the phrase "thread-safe". *)
 val execute : 'state worker -> ('state -> 'outcome) -> 'outcome Deferred.t
 
 (** Frees up all worker threads in the pool as well as the state associated
