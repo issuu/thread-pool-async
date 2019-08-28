@@ -50,31 +50,31 @@ let recreate_state ({create; destroy; _} as pool) {thread; state} =
   | Error exn -> destroy_pool_and_raise exn
 
 let init ~name ~threads:thread_count ~create ~destroy =
-  if thread_count <= 0
-  then raise @@ Invalid_thread_count thread_count
-  else
-    (* No strict ordering on the heap. All items are equal *)
-    let reader, writer = Pipe.create () in
-    let pool = {reader; writer; create; destroy; thread_count} in
-    let%bind threads =
-      List.init thread_count ~f:ignore
-      |> Deferred.List.map ~how:`Parallel ~f:(In_thread.Helper_thread.create ~name)
-    in
-    let create_state thread = try_in_thread ~thread create in
-    match%bind
-      threads
-      |> Deferred.List.map ~how:`Parallel ~f:create_state
-      |> Deferred.map ~f:Result.all
-    with
-    | Ok states ->
-        let add_worker (thread, state) =
-          Pipe.write_without_pushback writer {thread; state}
-        in
-        List.zip_exn threads states |> List.iter ~f:add_worker;
-        return pool
-    | Error exn ->
-        let%bind () = destroy_pool pool in
-        raise @@ State_manipulation_error exn
+  match thread_count with
+  | n when n <= 0 -> raise @@ Invalid_thread_count thread_count
+  | _ -> (
+      (* No strict ordering on the heap. All items are equal *)
+      let reader, writer = Pipe.create () in
+      let pool = {reader; writer; create; destroy; thread_count} in
+      let%bind threads =
+        List.init thread_count ~f:ignore
+        |> Deferred.List.map ~how:`Parallel ~f:(In_thread.Helper_thread.create ~name)
+      in
+      let create_state thread = try_in_thread ~thread create in
+      match%bind
+        threads
+        |> Deferred.List.map ~how:`Parallel ~f:create_state
+        |> Deferred.map ~f:Result.all
+      with
+      | Ok states ->
+          let add_worker (thread, state) =
+            Pipe.write_without_pushback writer {thread; state}
+          in
+          List.zip_exn threads states |> List.iter ~f:add_worker;
+          return pool
+      | Error exn ->
+          let%bind () = destroy_pool pool in
+          raise @@ State_manipulation_error exn)
 
 let execute {thread; state} work = In_thread.run ~thread (fun () -> work state)
 
