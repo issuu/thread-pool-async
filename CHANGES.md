@@ -1,3 +1,6 @@
+0.13.0
+======
+
 * Destroy the whole pool in case an exception is thrown while creating or
   destroying a piece of state associated with a worker thread. Indicate this
   through a new exception type.
