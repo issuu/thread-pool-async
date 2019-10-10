@@ -14,7 +14,7 @@ let launch_jobs ?(retries = 0) pool get_work =
   |> Deferred.map ~f:Result.all_unit
 
 let test_simple () =
-  let threads = 10 in
+  let threads = 5 in
   let states = ref 0 in
   let jobs = ref 0 in
   let create () = Int.incr states in
@@ -36,7 +36,7 @@ let test_simple () =
   return ()
 
 let test_error () =
-  let threads = 10 in
+  let threads = 5 in
   let states = ref 0 in
   let jobs = ref 0 in
   let errors = ref 0 in
@@ -61,7 +61,7 @@ let test_error () =
   return ()
 
 let test_retry () =
-  let threads = 10 in
+  let threads = 5 in
   let work_done = ref 0 in
   let creations_expected = threads + jobs_to_launch in
   let creations = ref 0 in
@@ -97,7 +97,7 @@ let test_retry () =
   return ()
 
 let test_retry_fail () =
-  let threads = 10 in
+  let threads = 5 in
   let tries = ref 0 in
   let create = ignore in
   let destroy = ignore in
@@ -110,7 +110,7 @@ let test_retry_fail () =
   return ()
 
 let test_interleaving_work_with_async_scheduler () =
-  let threads = 10 in
+  let threads = 5 in
   let states = ref 0 in
   let create () = Int.incr states; !states in
   let destroy = ignore in
@@ -130,14 +130,103 @@ let test_interleaving_work_with_async_scheduler () =
   Alcotest.(check (result unit unit)) "Worker changed state between uses" (Ok ()) result;
   return ()
 
+exception State_creation_error
+
+let check_exceptions fns =
+  let%bind results = fns |> List.map ~f:try_with |> Deferred.all in
+  List.iter results ~f:(fun result ->
+      Alcotest.(check (result reject unit))
+        "Expected an exception but it was not raised"
+        (Error ())
+        (Result.map_error result ~f:ignore));
+  return ()
+
+let check_exception fn = check_exceptions [fn]
+
+let test_init_exception () =
+  let create () = raise State_creation_error in
+  let destroy = ignore in
+  check_exception (fun () ->
+      Thread_pool.init ~name:"unittest" ~threads:1 ~create ~destroy)
+
+let test_init_cleanup () =
+  let create_success = 3 in
+  let threads = 5 in
+  let created = ref 0 in
+  let destroyed = ref 0 in
+  let create () =
+    match !created < create_success with
+    | true -> Int.incr created
+    | false -> raise State_creation_error
+  in
+  let destroy () = Int.incr destroyed in
+  let%bind () =
+    check_exception (fun () ->
+        Thread_pool.init ~name:"unittest" ~threads ~create ~destroy)
+  in
+  Alcotest.(check int) "Cleanup not complete" create_success !destroyed;
+  return ()
+
+let test_destroy_failure_while_recreating_state () =
+  let threads = 5 in
+  let create = ignore in
+  let destroy () = raise State_creation_error in
+  let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
+  check_exception (fun () -> Thread_pool.with' pool (fun _ -> Error ()))
+
+let test_create_failure_while_recreating_state () =
+  let threads = 5 in
+  let created = ref 0 in
+  let create () =
+    match !created < threads with
+    | true -> Int.incr created
+    | false -> raise State_creation_error
+  in
+  let destroy = ignore in
+  let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
+  check_exception (fun () -> Thread_pool.with' pool (fun _ -> Error ()))
+
+let test_multiple_concurrent_destructions () =
+  let threads = 5 in
+  let create = ignore in
+  let destroy () = raise State_creation_error in
+  let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
+  let provoke_pool_destruction () = Thread_pool.with' pool (fun _ -> Error ()) in
+  let%bind () =
+    check_exceptions @@ List.init (threads + 1) ~f:(fun _ -> provoke_pool_destruction)
+  in
+  return ()
+
+let test_case = Alcotest_async.test_case
+
 let test_set =
-  [ Alcotest_async.test_case "Simple" `Quick test_simple;
-    Alcotest_async.test_case "Error" `Quick test_error;
-    Alcotest_async.test_case "Retry" `Quick test_retry;
-    Alcotest_async.test_case "Retry with no allowance" `Quick test_retry_fail;
-    Alcotest_async.test_case
+  [ test_case "Simple" `Quick test_simple;
+    test_case "Error" `Quick test_error;
+    test_case "Retry" `Quick test_retry;
+    test_case "Retry with no allowance" `Quick test_retry_fail;
+    test_case
       "Interleave Async work with work on the pool"
       `Quick
-      test_interleaving_work_with_async_scheduler ]
+      test_interleaving_work_with_async_scheduler;
+    test_case
+      "Init raises wrapped exception if state cannot be created"
+      `Quick
+      test_init_exception;
+    test_case
+      "Init cleans up all successfully created states before failing"
+      `Quick
+      test_init_cleanup;
+    test_case
+      "State destruction failure while recreating state"
+      `Quick
+      test_destroy_failure_while_recreating_state;
+    test_case
+      "State creation failure while recreating state"
+      `Quick
+      test_create_failure_while_recreating_state;
+    test_case
+      "Multiple concurrent pool destructions get handled"
+      `Quick
+      test_multiple_concurrent_destructions ]
 
-let () = Alcotest.run Caml.__MODULE__ ["test_set", test_set]
+let () = Alcotest.run "thread_pool_async" ["test_set", test_set]

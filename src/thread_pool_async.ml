@@ -19,26 +19,39 @@ type 'state t = {
   create : unit -> 'state;
   destroy : 'state -> unit;
   thread_count : int;
+  (* Used to prevent rare race conditions when the pool is getting destroyed,
+     especially when state recreation fails for multiple workers concurrently. *)
+  destruction_in_progress : unit Deferred.t Ivar.t;
 }
 
 let try_in_thread ~thread f = try_with (fun () -> In_thread.run ~thread f)
 
-let destroy_pool {reader; writer; thread_count; destroy; _} =
-  let%bind states_destroyed =
-    List.init thread_count ~f:ignore
-    |> Deferred.List.map ~how:`Parallel ~f:(fun () ->
-           match%bind Pipe.read reader with
-           | `Eof -> return @@ Ok ()
-           | `Ok {thread; state} -> try_in_thread ~thread (fun () -> destroy state))
-    |> Deferred.map ~f:Result.all_unit
-  in
-  Pipe.close writer;
-  match states_destroyed with
-  | Ok () -> return ()
-  | Error exn -> raise @@ State_manipulation_error exn
+let destroy_pool {reader; writer; thread_count; destroy; destruction_in_progress; _} =
+  match Ivar.peek destruction_in_progress with
+  | Some destruction_done ->
+      (* wait upon the termination of the "other" destruction in progress *)
+      destruction_done
+  | None -> (
+      let fill_when_done = Ivar.create () in
+      let destruction_done = Ivar.read fill_when_done in
+      Ivar.fill destruction_in_progress destruction_done;
+      let%bind states_destroyed =
+        List.init thread_count ~f:ignore
+        |> Deferred.List.map ~how:`Parallel ~f:(fun () ->
+               match%bind Pipe.read reader with
+               | `Eof -> return @@ Ok ()
+               | `Ok {thread; state} -> try_in_thread ~thread (fun () -> destroy state))
+        |> Deferred.map ~f:Result.all_unit
+      in
+      Pipe.close writer;
+      Ivar.fill fill_when_done ();
+      match states_destroyed with
+      | Ok () -> return ()
+      | Error exn -> raise @@ State_manipulation_error exn)
 
-let recreate_state ({create; destroy; _} as pool) {thread; state} =
+let recreate_state ({create; destroy; writer; _} as pool) ({thread; state} as worker) =
   let destroy_pool_and_raise exn =
+    Pipe.write_without_pushback writer worker;
     let%bind () = destroy_pool pool in
     raise @@ State_manipulation_error exn
   in
@@ -55,17 +68,19 @@ let init ~name ~threads:thread_count ~create ~destroy =
   | _ -> (
       (* No strict ordering on the heap. All items are equal *)
       let reader, writer = Pipe.create () in
-      let pool = {reader; writer; create; destroy; thread_count} in
+      let destruction_in_progress = Ivar.create () in
+      let pool =
+        {reader; writer; create; destroy; thread_count; destruction_in_progress}
+      in
       let%bind threads =
         List.init thread_count ~f:ignore
         |> Deferred.List.map ~how:`Parallel ~f:(In_thread.Helper_thread.create ~name)
       in
       let create_state thread = try_in_thread ~thread create in
-      match%bind
-        threads
-        |> Deferred.List.map ~how:`Parallel ~f:create_state
-        |> Deferred.map ~f:Result.all
-      with
+      let%bind state_results =
+        Deferred.List.map threads ~how:`Parallel ~f:create_state
+      in
+      match Result.all state_results with
       | Ok states ->
           let add_worker (thread, state) =
             Pipe.write_without_pushback writer {thread; state}
@@ -73,7 +88,16 @@ let init ~name ~threads:thread_count ~create ~destroy =
           List.zip_exn threads states |> List.iter ~f:add_worker;
           return pool
       | Error exn ->
-          let%bind () = destroy_pool pool in
+          let%bind () =
+            List.zip_exn threads state_results
+            |> List.map ~f:(function
+                   | thread, Ok state ->
+                       try_in_thread ~thread (fun () -> destroy state) |> Deferred.ignore
+                   | _, Error _ -> return ())
+            |> Deferred.all
+            |> Deferred.map ~f:ignore
+          in
+          Pipe.close writer;
           raise @@ State_manipulation_error exn)
 
 let execute {thread; state} work = In_thread.run ~thread (fun () -> work state)
@@ -111,4 +135,4 @@ let with' pool ?(retries = 0) work =
   let job worker = execute worker work in
   with_worker pool ~retries job
 
-let destroy = destroy_pool
+let destroy pool = destroy_pool pool
