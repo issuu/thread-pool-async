@@ -1,3 +1,6 @@
+0.13.1
+======
+
 * Fixed bug that was causing the pool to get stuck (hang) while it was
   destroying itself. This bug could easily be triggered when state creation or
   destruction failed.
