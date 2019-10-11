@@ -72,28 +72,30 @@ let init ~name ~threads:thread_count ~create ~destroy =
       let pool =
         {reader; writer; create; destroy; thread_count; destruction_in_progress}
       in
-      let%bind threads =
+      let create_state () =
+        let%bind thread = In_thread.Helper_thread.create ~name () in
+        try_in_thread ~thread create
+        |> Deferred.Result.map ~f:(fun state -> thread, state)
+      in
+      let%bind worker_results =
         List.init thread_count ~f:ignore
-        |> Deferred.List.map ~how:`Parallel ~f:(In_thread.Helper_thread.create ~name)
+        |> Deferred.List.map ~how:`Parallel ~f:create_state
       in
-      let create_state thread = try_in_thread ~thread create in
-      let%bind state_results =
-        Deferred.List.map threads ~how:`Parallel ~f:create_state
-      in
-      match Result.all state_results with
-      | Ok states ->
+      match Result.all worker_results with
+      | Ok workers ->
           let add_worker (thread, state) =
             Pipe.write_without_pushback writer {thread; state}
           in
-          List.zip_exn threads states |> List.iter ~f:add_worker;
+          List.iter workers ~f:add_worker;
           return pool
       | Error exn ->
+          let destroy_if_created = function
+            | Ok (thread, state) -> try_in_thread ~thread (fun () -> destroy state)
+            | Error _ -> return @@ Ok ()
+          in
           let%bind () =
-            List.zip_exn threads state_results
-            |> List.map ~f:(function
-                   | thread, Ok state ->
-                       try_in_thread ~thread (fun () -> destroy state) |> Deferred.ignore
-                   | _, Error _ -> return ())
+            worker_results
+            |> List.map ~f:destroy_if_created
             |> Deferred.all
             |> Deferred.map ~f:ignore
           in

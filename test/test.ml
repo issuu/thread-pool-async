@@ -192,10 +192,7 @@ let test_multiple_concurrent_destructions () =
   let destroy () = raise State_creation_error in
   let%bind pool = Thread_pool.init ~name:"unittest" ~threads ~create ~destroy in
   let provoke_pool_destruction () = Thread_pool.with' pool (fun _ -> Error ()) in
-  let%bind () =
-    check_exceptions @@ List.init (threads + 1) ~f:(fun _ -> provoke_pool_destruction)
-  in
-  return ()
+  check_exceptions @@ List.init (threads + 1) ~f:(fun _ -> provoke_pool_destruction)
 
 let test_case = Alcotest_async.test_case
 
