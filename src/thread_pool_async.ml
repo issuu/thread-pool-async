@@ -135,4 +135,4 @@ let with' pool ?(retries = 0) work =
   let job worker = execute worker work in
   with_worker pool ~retries job
 
-let destroy pool = destroy_pool pool
+let destroy = destroy_pool
